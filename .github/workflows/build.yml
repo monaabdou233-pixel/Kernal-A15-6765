@@ -9,47 +9,48 @@ jobs:
     container:
       image: ubuntu:20.04
     steps:
-    - name: Checkout Kernel Source
+    - name: Checkout Source
       uses: actions/checkout@v4
       with:
         fetch-depth: 1
 
-    - name: Install Build Dependencies
+    - name: Install Build Packages
       run: |
-        # Prevent interactive prompts from blocking apt updates
         export DEBIAN_FRONTEND=noninteractive
         apt-get update
-        apt-get install -y bc build-essential libssl-dev \
-          bison flex libelf-dev ccache lz4 libncurses5-dev libncurses5 \
-          git zip libffi-dev libtinfo5 curl
-          
-    - name: Download AOSP Clang and GCC Toolchains
+        apt-get install -y \
+          python2 python-is-python2 git ccache automake flex lzop bison gperf \
+          build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 \
+          libbz2-dev libghc-bzlib-dev squashfs-tools pngcrush fontconfig \
+          liblz4-tool make optipng maven libssl-dev pwgen bc libc6-dev-i386 \
+          libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip \
+          device-tree-compiler libncurses5 libtinfo5 wget
+
+    - name: Download Toolchains
       run: |
-        mkdir -p toolchain/clang toolchain/x64 toolchain/x32
+        mkdir -p tools
         
-        echo "==> Downloading AOSP Clang 4691093... <=="
-        curl -sLO "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-9.0.0_r3/clang-4691093.tar.gz"
-        tar -xzf clang-4691093.tar.gz -C toolchain/clang
-        rm clang-4691093.tar.gz
-
-        echo "==> Cloning AOSP GCC 64-bit... <=="
-        git clone --depth=1 -b master-kernel-build-2021 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 toolchain/x64
-
-        echo "==> Cloning AOSP GCC 32-bit... <=="
-        git clone --depth=1 -b master-kernel-build-2021 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 toolchain/x32
+        echo "==> Cloning Clang 6.0.2... <=="
+        git clone https://github.com/KAGA-KOKO/clang-6.0.2 -b clang --depth=1 tools/clang
+        
+        echo "==> Cloning GCC 64-bit... <=="
+        git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 -b ndk-release-r16 --depth=1 tools/gcc64
+        
+        echo "==> Cloning GCC 32-bit... <=="
+        git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 -b ndk-release-r16 --depth=1 tools/gcc32
 
     - name: Build Kernel
       run: |
-        # Safe directory flag for git within Docker environments
+        # Fix git ownership security warnings inside Docker containers
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
         
         cd kernel-4.9
         
-        # Absolute path tracking for the toolchains
-        WORK=$GITHUB_WORKSPACE/toolchain
-        export PATH="${WORK}/clang/bin:${WORK}/x64/bin:${WORK}/x32/bin:/usr/bin:/bin"
+        # Absolute path mapping to your newly set up tools folder
+        TOOLS_DIR=$GITHUB_WORKSPACE/tools
+        export PATH="${TOOLS_DIR}/clang/bin:${TOOLS_DIR}/gcc64/bin:${TOOLS_DIR}/gcc32/bin:/usr/bin:/bin"
         
-        # Build Environment Configuration
+        # Kernel Architecture Environment flags
         export ARCH=arm64
         export SUBARCH=arm64
         PROCS=$(nproc --all)
@@ -77,12 +78,12 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/output
           cp out/arch/arm64/boot/Image.gz $GITHUB_WORKSPACE/output/Image.gz
         else
-          echo "Error: Output target image not found. Build failed."
+          echo "Error: Target kernel image not found. Compilation layout failed."
           exit 1
         fi
 
     - name: Upload Kernel Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Oppo-A15-Kernel-AOSP
+        name: Oppo-A15-Kernel-CustomClang
         path: output/*
