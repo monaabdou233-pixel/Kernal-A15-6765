@@ -6,6 +6,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
     steps:
     - name: Checkout Kernel Source
       uses: actions/checkout@v4
@@ -14,11 +16,13 @@ jobs:
 
     - name: Install Build Dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y bc build-essential libssl-dev libcrypto++-dev \
+        # Prevent interactive prompts from blocking apt updates
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update
+        apt-get install -y bc build-essential libssl-dev \
           bison flex libelf-dev ccache lz4 libncurses5-dev libncurses5 \
-          git zip libffi-dev libtinfo5
-
+          git zip libffi-dev libtinfo5 curl
+          
     - name: Download AOSP Clang and GCC Toolchains
       run: |
         mkdir -p toolchain/clang toolchain/x64 toolchain/x32
@@ -36,7 +40,9 @@ jobs:
 
     - name: Build Kernel
       run: |
-        # Change directory to the actual kernel folder
+        # Safe directory flag for git within Docker environments
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        
         cd kernel-4.9
         
         # Absolute path tracking for the toolchains
