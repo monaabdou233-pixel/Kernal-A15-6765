@@ -28,12 +28,10 @@ jobs:
 
     - name: Download Toolchains
       run: |
-        mkdir -p tools/clang
+        mkdir -p tools
         
-        echo "==> Downloading and extracting AOSP Clang 11.0.5 (r399163b)... <=="
-        wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/19b9347eeff21da190299d725e5d792b20216dfe/clang-r399163b.tar.gz -O clang.tar.gz
-        tar -xzf clang.tar.gz -C tools/clang
-        rm clang.tar.gz
+        echo "==> Cloning EviraKernel Clang 11... <=="
+        git clone https://github.com/EviraKernel/Clang-11 -b master --depth=1 tools/clang
         
         echo "==> Cloning GCC 64-bit... <=="
         git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 -b ndk-release-r16 --depth=1 tools/gcc64
@@ -48,7 +46,7 @@ jobs:
         
         cd kernel-4.9
         
-        # Absolute path mapping to your newly set up tools folder
+        # Absolute path mapping to your tools folder
         TOOLS_DIR=$GITHUB_WORKSPACE/tools
         export PATH="${TOOLS_DIR}/clang/bin:${TOOLS_DIR}/gcc64/bin:${TOOLS_DIR}/gcc32/bin:/usr/bin:/bin"
         
@@ -89,5 +87,5 @@ jobs:
     - name: Upload Kernel Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Oppo-A15-Kernel-Clang11
+        name: Oppo-A15-Kernel-EviraClang11
         path: output/*
