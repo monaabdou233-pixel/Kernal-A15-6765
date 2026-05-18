@@ -95,8 +95,15 @@
 
 #ifdef VENDOR_EDIT
 // Kun.Hu@TECH.BSP.Stability.PHOENIX_PROJECT 2019/06/11, Add for phoenix project
-#include "../../vendor/oppo/oppo_phoenix/kernel/oppo_phoenix/oppo_phoenix.h"
+#include "../drivers/soc/oppo/oppo_phoenix/oppo_phoenix.h"
 #endif  //VENDOR_EDIT
+
+#ifdef VENDOR_EDIT
+// Bin.Xu@BSP.Kernel.Stability, 2020/1/2, Add for oppo key handle
+#ifdef CONFIG_OPPO_KEY_HANDLE
+#include <linux/oppo_key_handle.h>
+#endif
+#endif /* VENDOR_EDIT */
 
 static int kernel_init(void *);
 
@@ -434,6 +441,13 @@ static int __init do_early_param(char *param, char *val,
 		}
 	}
 	/* We accept everything at this stage. */
+#ifdef VENDOR_EDIT
+// Bin.Xu @ BSP.Kernel.Stability, 2019/12/02, Add for oppo_key_handle.
+#ifdef CONFIG_OPPO_KEY_HANDLE
+	if (strcmp(param, "password_base") == 0)
+		get_passwd_base(val);
+#endif
+#endif /* VENDOR_EDIT */
 
 	return 0;
 }
