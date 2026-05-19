@@ -82,11 +82,6 @@ endif
 obj-$(CONFIG_QRTR)		+= qrtr/
 obj-$(CONFIG_NET_NCSI)		+= ncsi/
 
-#ifdef VENDOR_EDIT
-#Junyuan.Huang@PSW.CN.WiFi.Network.internet.1197891, 2018/04/10,
-#Add code for appo sla function
-obj-y                   	+= oppo_sla/
-#endif /* VENDOR_EDIT */
 
 
 #ifdef VENDOR_EDIT
@@ -94,10 +89,3 @@ obj-y                   	+= oppo_sla/
 #Add for WeChat lucky money recognition
 obj-y				+= oppo_nf_hooks/
 #endif /* VENDOR_EDIT */
-
-#ifdef VENDOR_EDIT
-#Asiga@PSW.NW.DATA.2120730, 2019/06/26.
-#Add for classify glink wakeup services and count IPA wakeup.
-obj-y				+= oppo_nwpower/
-#endif /* VENDOR_EDIT */
-
