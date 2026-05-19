@@ -1,4 +1,3 @@
-#
 # Makefile for the linux networking.
 #
 # 2 Sep 2000, Christoph Hellwig <hch@infradead.org>
@@ -82,10 +81,14 @@ endif
 obj-$(CONFIG_QRTR)		+= qrtr/
 obj-$(CONFIG_NET_NCSI)		+= ncsi/
 
-
-
 #ifdef VENDOR_EDIT
 #Yuan.Huang@PSW.CN.WiFi.Network.internet.1461349, 2018/06/18,
 #Add for WeChat lucky money recognition
 obj-y				+= oppo_nf_hooks/
+#endif /* VENDOR_EDIT */
+
+#ifdef VENDOR_EDIT
+#Asiga@PSW.NW.DATA.2120730, 2019/06/26.
+#Add for classify glink wakeup services and count IPA wakeup.
+obj-y				+= oppo_nwpower/
 #endif /* VENDOR_EDIT */
