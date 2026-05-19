@@ -236,24 +236,6 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 
 # Cross compiling and selecting different set of gcc/bin-utils
 # ---------------------------------------------------------------------------
-#
-# When performing cross compilation for other architectures ARCH shall be set
-# to the target architecture. (See arch/* for the possibilities).
-# ARCH can be set during invocation of make:
-# make ARCH=ia64
-# Another way is to have ARCH set in the environment.
-# The default ARCH is the host where make is executed.
-
-# CROSS_COMPILE specify the prefix used for all executables used
-# during compilation. Only gcc and related bin-utils executables
-# are prefixed with $(CROSS_COMPILE).
-# CROSS_COMPILE can be set on the command line
-# make CROSS_COMPILE=ia64-linux-
-# Alternatively CROSS_COMPILE can be set in the environment.
-# A third alternative is to store a setting in .config so that plain
-# "make" in the configured kernel build directory always uses that.
-# Default value for CROSS_COMPILE is not to prefix executables
-# Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 ARCH		?= $(SUBARCH)
 CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
 CROSS_COMPILE_ARM32	?= $(CONFIG_CROSS_COMPILE_ARM32:"%"=%)
@@ -308,23 +290,12 @@ HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-
 HOSTCXXFLAGS = -O2
 
 # Decide whether to build built-in, modular, or both.
-# Normally, just do built-in.
-
 KBUILD_MODULES :=
 KBUILD_BUILTIN := 1
-
-# If we have only "make modules", don't compile built-in objects.
-# When we're building modules with modversions, we need to consider
-# the built-in objects during the descend as well, in order to
-# make sure the checksums are up to date before we record them.
 
 ifeq ($(MAKECMDGOALS),modules)
   KBUILD_BUILTIN := $(if $(CONFIG_MODVERSIONS),1)
 endif
-
-# If we have "make <whatever> modules", compile modules
-# in addition to whatever we do anyway.
-# Just "make" or "make all" shall build modules as well
 
 ifneq ($(filter all _all modules,$(MAKECMDGOALS)),)
   KBUILD_MODULES := 1
@@ -340,6 +311,9 @@ export KBUILD_CHECKSRC KBUILD_SRC KBUILD_EXTMOD
 # We need some generic definitions (do not try to remake the file).
 scripts/Kbuild.include: ;
 include scripts/Kbuild.include
+
+# Determine compiler name early for conditional assignments
+cc-name := $(shell $(CONFIG_SHELL) $(srctree)/scripts/cc-version.sh $(CC) | cut -d' ' -f1)
 
 # Make variables (CC, etc...)
 AS		= $(CROSS_COMPILE)as
@@ -379,7 +353,6 @@ USERINCLUDE    := \
                 -include $(srctree)/include/linux/kconfig.h
 
 # Use LINUXINCLUDE when you must reference the include/ directory.
-# Needed to be compatible with the O= option
 LINUXINCLUDE    := \
 		-I$(srctree)/arch/$(hdr-arch)/include \
 		-I$(objtree)/arch/$(hdr-arch)/include/generated/uapi \
@@ -404,47 +377,33 @@ KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 GCC_PLUGINS_CFLAGS :=
 CLANG_FLAGS :=
 
-#ifdef VENDOR_EDIT
-#Jianchao.Shi@PSW.BSP.CHG.Basic, 2019/05/09, sjc Add for 806 high/low temp aging test
+# OPPO Vendor Flags Setup
 ifeq ($(OPPO_HIGH_TEMP_VERSION),true)
 KBUILD_CFLAGS += -DCONFIG_HIGH_TEMP_VERSION
 KBUILD_CPPFLAGS += -DCONFIG_HIGH_TEMP_VERSION
 endif
-#endif /* VENDOR_EDIT */
 
-#ifdef  VENDOR_EDIT
-#LiPing-m@PSW.MM.Display.LCD.Machine, 2017/11/03, Add for VENDOR_EDIT macro in kernel
 KBUILD_CFLAGS +=   -DVENDOR_EDIT
 KBUILD_CPPFLAGS += -DVENDOR_EDIT
 CFLAGS_KERNEL +=   -DVENDOR_EDIT
 CFLAGS_MODULE +=   -DVENDOR_EDIT
-#endif /* VENDOR_EDIT */
 
-#ifdef VENDOR_EDIT
-#zhouhengguo@PSW.BSP.Kernel.Stablity, 2019/11/05, add daily build
 ifneq ($(TARGET_BUILD_VARIANT), user)
 KBUILD_CFLAGS   += -DOPPO_TARGET_BUILD_DAILY
 KBUILD_CPPFLAGS += -DOPPO_TARGET_BUILD_DAILY
 CFLAGS_KERNEL   += -DOPPO_TARGET_BUILD_DAILY
 CFLAGS_MODULE   += -DOPPO_TARGET_BUILD_DAILY
 endif
-#endif /*VENDOR_EDIT*/
 
-#ifdef ODM_WT_EDIT
-#Hui.Yuan@ODM_WT.BSP.Kernel.stability, 2020/06/09,modify for aee_kpd_enable control*/
 ifeq ($(OBSOLETE_KEEP_ADB_SECURE),1)
 KBUILD_CFLAGS += -DENABLE_LONG_PWKDUMP
 endif
-#endif
 
-#ifdef VENDOR_EDIT
-#ye.zhang@Sensor.config,2016-09-09, add for CTSI support external storage or not
 $(info @@@@@@@@@@@ OPPO_BUILD_CUSTOMIZE is $(OPPO_BUILD_CUSTOMIZE))
 KBUILD_CFLAGS += -DMOUNT_EXSTORAGE_IF
 KBUILD_CPPFLAGS += -DMOUNT_EXSTORAGE_IF
 CFLAGS_KERNEL += -DMOUNT_EXSTORAGE_IF
 CFLAGS_MODULE += -DMOUNT_EXSTORAGE_IF
-#endif /* VENDOR_EDIT */
 
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
 KERNELRELEASE = $(shell cat include/config/kernel.release 2> /dev/null)
@@ -464,21 +423,15 @@ export KBUILD_AFLAGS_MODULE KBUILD_CFLAGS_MODULE KBUILD_LDFLAGS_MODULE
 export KBUILD_AFLAGS_KERNEL KBUILD_CFLAGS_KERNEL
 export KBUILD_ARFLAGS
 
-# When compiling out-of-tree modules, put MODVERDIR in the module
-# tree rather than in the kernel tree. The kernel tree might
-# even be read-only.
+# Out of tree modules setup
 export MODVERDIR := $(if $(KBUILD_EXTMOD),$(firstword $(KBUILD_EXTMOD))/).tmp_versions
 
-# Files to ignore in find ... statements
-
+# Files to ignore in find statements
 export RCS_FIND_IGNORE := \( -name SCCS -o -name BitKeeper -o -name .svn -o    \
 			  -name CVS -o -name .pc -o -name .hg -o -name .git \) \
 			  -prune -o
 export RCS_TAR_IGNORE := --exclude SCCS --exclude BitKeeper --exclude .svn \
 			 --exclude CVS --exclude .pc --exclude .hg --exclude .git
-
-# ===========================================================================
-# Rules shared between *config targets and build targets
 
 # Basic helpers built in scripts/
 PHONY += scripts_basic
@@ -486,13 +439,9 @@ scripts_basic:
 	$(Q)$(MAKE) $(build)=scripts/basic
 	$(Q)rm -f .tmp_quiet_recordmcount
 
-# To avoid any implicit rule to kick in, define an empty command.
 scripts/basic/%: scripts_basic ;
 
 PHONY += outputmakefile
-# outputmakefile generates a Makefile in the output directory, if using a
-# separate output directory. This allows convenient use of make in the
-# output directory.
 outputmakefile:
 ifneq ($(KBUILD_SRC),)
 	$(Q)ln -fsn $(srctree) source
@@ -500,21 +449,12 @@ ifneq ($(KBUILD_SRC),)
 	    $(srctree) $(objtree) $(VERSION) $(PATCHLEVEL)
 endif
 
-# Support for using generic headers in asm-generic
 PHONY += asm-generic
 asm-generic:
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.asm-generic \
 	            src=asm obj=arch/$(SRCARCH)/include/generated/asm
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.asm-generic \
 	            src=uapi/asm obj=arch/$(SRCARCH)/include/generated/uapi/asm
-
-# To make sure we do not include .config for any of the *config targets
-# catch them early, and hand them over to scripts/kconfig/Makefile
-# It is allowed to specify more targets when calling make, including
-# mixing *config targets and build targets.
-# For example 'make oldconfig all'.
-# Detect when mixed targets is specified, and make a second invocation
-# of make so .config is not included in this case either (for *config).
 
 version_h := include/generated/uapi/linux/version.h
 old_version_h := include/linux/version.h
@@ -542,23 +482,23 @@ ifeq ($(KBUILD_EXTMOD),)
                 endif
         endif
 endif
-# install and module_install need also be processed one by one
+
 ifneq ($(filter install,$(MAKECMDGOALS)),)
         ifneq ($(filter modules_install,$(MAKECMDGOALS)),)
 	        mixed-targets := 1
         endif
 endif
 
+# Clang Toolchain Target Handling
 ifeq ($(cc-name),clang)
 ifneq ($(CROSS_COMPILE),)
 CLANG_TRIPLE	?= $(CROSS_COMPILE)
 CLANG_FLAGS	+= --target=$(notdir $(CLANG_TRIPLE:%-=%))
-ifeq ($(shell $(srctree)/scripts/clang-android.sh $(CC) $(CLANG_FLAGS)), y)
-$(error "Clang with Android --target detected. Did you specify CLANG_TRIPLE?")
-endif
-GCC_TOOLCHAIN_DIR := $(dir $(shell which $(CROSS_COMPILE)elfedit))
+GCC_TOOLCHAIN_DIR := $(dir $(shell which $(CROSS_COMPILE)elfedit 2>/dev/null || echo /dev/null))
+ifneq ($(GCC_TOOLCHAIN_DIR),/dev/)
 CLANG_FLAGS	+= --prefix=$(GCC_TOOLCHAIN_DIR)
 GCC_TOOLCHAIN	:= $(realpath $(GCC_TOOLCHAIN_DIR)/..)
+endif
 endif
 ifneq ($(GCC_TOOLCHAIN),)
 CLANG_FLAGS	+= --gcc-toolchain=$(GCC_TOOLCHAIN)
@@ -569,14 +509,8 @@ KBUILD_CFLAGS	+= $(CLANG_FLAGS)
 KBUILD_AFLAGS	+= $(CLANG_FLAGS)
 endif
 
-
 ifeq ($(mixed-targets),1)
-# ===========================================================================
-# We're called with mixed targets (*config and build targets).
-# Handle them one by one.
-
 PHONY += $(MAKECMDGOALS) __build_one_by_one
-
 $(filter-out __build_one_by_one, $(MAKECMDGOALS)): __build_one_by_one
 	@:
 
@@ -588,13 +522,6 @@ __build_one_by_one:
 
 else
 ifeq ($(config-targets),1)
-# ===========================================================================
-# *config targets only - make sure prerequisites are updated, and descend
-# in scripts/kconfig to make the *config target
-
-# Read arch specific Makefile to set KBUILD_DEFCONFIG as needed.
-# KBUILD_DEFCONFIG may point out an alternative default configuration
-# used for 'make defconfig'
 include arch/$(SRCARCH)/Makefile
 export KBUILD_DEFCONFIG KBUILD_KCONFIG
 
@@ -605,49 +532,30 @@ config: scripts_basic outputmakefile FORCE
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
 
 else
-# ===========================================================================
-# Build targets only - this includes vmlinux, arch specific targets, clean
-# targets and others. In general all targets except *config targets.
-
 ifeq ($(KBUILD_EXTMOD),)
-# Additional helpers built in scripts/
-# Carefully list dependencies so we do not try to build scripts twice
-# in parallel
 PHONY += scripts
 scripts: scripts_basic include/config/auto.conf include/config/tristate.conf \
 	 asm-generic gcc-plugins
 	$(Q)$(MAKE) $(build)=$(@)
 
-# Objects we will link into vmlinux / subdirs we need to visit
 init-y		:= init/
 drivers-y	:= drivers/ sound/ firmware/
 net-y		:= net/
 libs-y		:= lib/
 core-y		:= usr/
 virt-y		:= virt/
-endif # KBUILD_EXTMOD
+endif
 
 ifeq ($(dot-config),1)
-# Read in config
 -include include/config/auto.conf
 
 ifeq ($(KBUILD_EXTMOD),)
-# Read in dependencies to all Kconfig* files, make sure to run
-# oldconfig if changes are detected.
 -include include/config/auto.conf.cmd
-
-# To avoid any implicit rule to kick in, define an empty command
 $(KCONFIG_CONFIG) include/config/auto.conf.cmd: ;
 
-# If .config is newer than include/config/auto.conf, someone tinkered
-# with it and forgot to run make oldconfig.
-# if auto.conf.cmd is missing then we are probably in a cleaned tree so
-# we execute the config step to be sure to catch updated Kconfig files
 include/config/%.conf: $(KCONFIG_CONFIG) include/config/auto.conf.cmd
 	$(Q)$(MAKE) -f $(srctree)/Makefile silentoldconfig
 else
-# external modules needs include/generated/autoconf.h and include/config/auto.conf
-# but do not care if they are up-to-date. Use auto.conf to trigger the test
 PHONY += include/config/auto.conf
 
 include/config/auto.conf:
@@ -658,25 +566,15 @@ include/config/auto.conf:
 	echo >&2 "         Run 'make oldconfig && make prepare' on kernel src to fix it.";	\
 	echo >&2 ;							\
 	/bin/false)
-
-endif # KBUILD_EXTMOD
-
+endif
 else
-# Dummy target needed, because used as prerequisite
 include/config/auto.conf: ;
-endif # $(dot-config)
+endif
 
-# For the kernel to actually contain only the needed exported symbols,
-# we have to build modules as well to determine what those symbols are.
-# (this can be evaluated only once include/config/auto.conf has been included)
 ifdef CONFIG_TRIM_UNUSED_KSYMS
   KBUILD_MODULES := 1
 endif
 
-# The all: target is the default when no target is given on the
-# command line.
-# This allow a user to issue only 'make' to build a kernel including modules
-# Defaults to vmlinux, but the arch makefile usually adds further targets
 all: vmlinux
 
 KBUILD_CFLAGS	+= $(call cc-option,-fno-PIE)
@@ -685,22 +583,15 @@ CFLAGS_GCOV	:= -fprofile-arcs -ftest-coverage -fno-tree-loop-im $(call cc-disabl
 CFLAGS_KCOV	:= $(call cc-option,-fsanitize-coverage=trace-pc,)
 export CFLAGS_GCOV CFLAGS_KCOV
 
-# Make toolchain changes before including arch/$(SRCARCH)/Makefile to ensure
-# ar/cc/ld-* macros return correct values.
 ifdef CONFIG_LTO_CLANG
-# use GNU gold with LLVMgold for LTO linking, and LD for vmlinux_link
 LDFINAL_vmlinux := $(LD)
 LD		:= $(LDGOLD)
 LDFLAGS		+= -plugin LLVMgold.so
-# use llvm-ar for building symbol tables from IR files, and llvm-dis instead
-# of objdump for processing symbol versions and exports
 LLVM_AR		:= llvm-ar
 LLVM_DIS	:= llvm-dis
 export LLVM_AR LLVM_DIS
 endif
 
-# The arch Makefile can set ARCH_{CPP,A,C}FLAGS to override the default
-# values of the respective KBUILD_* variables
 ARCH_CPPFLAGS :=
 ARCH_AFLAGS :=
 ARCH_CFLAGS :=
@@ -721,8 +612,6 @@ endif
 
 ifdef CONFIG_LTO_CLANG
 lto-clang-flags	:= -flto -fvisibility=hidden
-
-# allow disabling only clang LTO where needed
 DISABLE_LTO_CLANG := -fno-lto -fvisibility=default
 export DISABLE_LTO_CLANG
 endif
@@ -730,12 +619,8 @@ endif
 ifdef CONFIG_LTO
 lto-flags	:= $(lto-clang-flags)
 KBUILD_CFLAGS	+= $(lto-flags)
-
 DISABLE_LTO	:= $(DISABLE_LTO_CLANG)
 export DISABLE_LTO
-
-# LDFINAL_vmlinux and LDFLAGS_FINAL_vmlinux can be set to override
-# the linker and flags for vmlinux_link.
 export LDFINAL_vmlinux LDFLAGS_FINAL_vmlinux
 endif
 
@@ -744,5 +629,13 @@ cfi-clang-flags	+= -fsanitize=cfi
 DISABLE_CFI_CLANG := -fno-sanitize=cfi
 ifdef CONFIG_MODULES
 cfi-clang-flags	+= -fsanitize-cfi-cross-dso
-DISABLE_
+DISABLE_CFI_CLANG += -fno-sanitize-cfi-cross-dso
+endif
+KBUILD_CFLAGS	+= $(cfi-clang-flags)
+export DISABLE_CFI_CLANG
+endif
+
+endif
+endif
+endif
 
